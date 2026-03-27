@@ -24,6 +24,7 @@ export default function MicroCenterPage() {
   const [saveName, setSaveName] = useState("");
   const [saveEmail, setSaveEmail] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Saved searches
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
@@ -72,20 +73,31 @@ export default function MicroCenterPage() {
   async function saveSearch() {
     if (!saveName || !saveEmail) return;
     setSaving(true);
-    await fetch("/api/microcenter/saved", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: saveName,
-        storeIds: selectedStores,
-        minSavings,
-        email: saveEmail,
-      }),
-    });
-    setSaveName("");
-    setSaveEmail("");
-    setSaving(false);
-    loadSaved();
+    setSaveError(null);
+    try {
+      const res = await fetch("/api/microcenter/saved", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: saveName,
+          storeIds: selectedStores,
+          minSavings,
+          email: saveEmail,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setSaveError(data.error ?? "Failed to save search");
+      } else {
+        setSaveName("");
+        setSaveEmail("");
+        loadSaved();
+      }
+    } catch {
+      setSaveError("Failed to reach server");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function deleteSearch(id: string) {
@@ -249,6 +261,9 @@ export default function MicroCenterPage() {
             {saving ? "Saving..." : "Save Search"}
           </button>
         </div>
+        {saveError && (
+          <p className="mt-2 text-xs text-red-600">{saveError}</p>
+        )}
         <p className="text-xs text-gray-400 mt-3">
           Requires <code className="bg-gray-100 px-1 rounded">GMAIL_USER</code> + <code className="bg-gray-100 px-1 rounded">GMAIL_APP_PASSWORD</code> in <code className="bg-gray-100 px-1 rounded">.env.local</code> to send email.
           For daily alerts: <code className="bg-gray-100 px-1 rounded text-[11px]">crontab -e</code> → add <code className="bg-gray-100 px-1 rounded text-[11px]">0 9 * * * curl -s -X POST http://localhost:3000/api/microcenter/saved/run?id=SEARCH_ID</code>

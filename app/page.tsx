@@ -4,6 +4,7 @@ import { useState } from "react";
 import ParsedParamsChips from "./components/ParsedParamsChips";
 import ResultsGrid from "./components/ResultsGrid";
 import type { Listing, SearchParams } from "./lib/types";
+import { CITY_TO_CL } from "./lib/cities";
 
 type Source = "all" | "craigslist" | "ebay" | "facebook";
 
@@ -13,19 +14,6 @@ const EXAMPLE_SEARCHES = [
   "Trek mountain bike, any condition, under $600 in Austin",
   "Vintage leather couch or sofa under $300 in Chicago",
 ];
-
-// Maps common city names to Craigslist subdomains
-const CITY_TO_CL: Record<string, string> = {
-  "new york": "newyork", "nyc": "newyork", "los angeles": "losangeles", "la": "losangeles",
-  "san francisco": "sfbay", "sf": "sfbay", "bay area": "sfbay", "chicago": "chicago",
-  "seattle": "seattle", "denver": "denver", "dallas": "dallas", "houston": "houston",
-  "phoenix": "phoenix", "portland": "portland", "austin": "austin", "miami": "miami",
-  "atlanta": "atlanta", "boston": "boston", "minneapolis": "minneapolis",
-  "san diego": "sandiego", "las vegas": "lasvegas", "detroit": "detroit",
-  "philadelphia": "philadelphia", "nashville": "nashville", "sacramento": "sacramento",
-  "raleigh": "raleigh", "tampa": "tampa", "orlando": "orlando", "pittsburgh": "pittsburgh",
-  "kansas city": "kansascity", "salt lake city": "saltlakecity", "slc": "saltlakecity",
-};
 
 function buildCraigslistUrl(params: SearchParams): string {
   const locationKey = (params.location ?? "").toLowerCase().trim();
@@ -46,6 +34,8 @@ export default function Home() {
   const [searchParams, setSearchParams] = useState<SearchParams | null>(null);
   const [categoryLabel, setCategoryLabel] = useState("");
   const [listings, setListings] = useState<Listing[]>([]);
+  const [rawCount, setRawCount] = useState(0);
+  const [filterFailed, setFilterFailed] = useState(false);
   const [clUrl, setClUrl] = useState("");
   const [activeSource, setActiveSource] = useState<Source>("all");
   const [sourceErrors, setSourceErrors] = useState<string[]>([]);
@@ -58,6 +48,8 @@ export default function Home() {
     setError(null);
     setSearchParams(null);
     setListings([]);
+    setRawCount(0);
+    setFilterFailed(false);
     setSourceErrors([]);
     setActiveSource("all");
 
@@ -120,6 +112,7 @@ export default function Home() {
 
       // Step 3: Filter for relevance with Claude
       setLoadingStep("Filtering relevant results...");
+      setRawCount(allListings.length);
       let relevantListings = allListings;
       if (allListings.length > 0) {
         try {
@@ -129,11 +122,14 @@ export default function Home() {
             body: JSON.stringify({ listings: allListings, description }),
           });
           if (filterRes.ok) {
-            const { listings: filtered } = await filterRes.json();
-            relevantListings = filtered;
+            const data = await filterRes.json();
+            relevantListings = data.listings;
+            if (data.filterFailed) setFilterFailed(true);
+          } else {
+            setFilterFailed(true);
           }
         } catch {
-          // fallback: show all results
+          setFilterFailed(true);
         }
       }
 
@@ -259,6 +255,12 @@ export default function Home() {
           </div>
         )}
 
+        {filterFailed && !loading && (
+          <div className="mb-4 text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            ⚠️ Relevance filtering unavailable — showing all {rawCount} raw results
+          </div>
+        )}
+
 {!loading && searchParams && (
           <>
             {/* Source tabs */}
@@ -328,7 +330,10 @@ export default function Home() {
               </div>
             ) : (
               <div className="text-center py-10 text-gray-400">
-                <p>No results found. Try broadening your search or a different location.</p>
+                {rawCount > 0 && !filterFailed
+                  ? <p>{rawCount} listing{rawCount !== 1 ? "s" : ""} found, but none matched your criteria after filtering. Try broadening your search.</p>
+                  : <p>No results found. Try broadening your search or a different location.</p>
+                }
               </div>
             )}
 

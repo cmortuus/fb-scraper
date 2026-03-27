@@ -3,37 +3,13 @@ import { chromium } from "playwright";
 import path from "path";
 import os from "os";
 import type { Listing } from "@/app/lib/types";
+import { CITY_TO_FB } from "@/app/lib/cities";
 
 // Use the user's real Chrome profile so they're already logged into Facebook
 const CHROME_USER_DATA = path.join(
   os.homedir(),
   "Library/Application Support/Google/Chrome"
 );
-
-// Maps city names to Facebook Marketplace city slugs (used in URL path)
-const CITY_TO_FB: Record<string, string> = {
-  "new york": "nyc", "nyc": "nyc", "los angeles": "la", "la": "la",
-  "san francisco": "sanfrancisco", "sf": "sanfrancisco", "bay area": "sanfrancisco",
-  "chicago": "chicago", "seattle": "seattle", "denver": "denver",
-  "dallas": "dallas", "houston": "houston", "phoenix": "phoenix",
-  "portland": "portland", "austin": "austin", "miami": "miami",
-  "atlanta": "atlanta", "boston": "boston", "minneapolis": "minneapolis",
-  "san diego": "sandiego", "las vegas": "lasvegas", "detroit": "detroit",
-  "philadelphia": "philadelphia", "nashville": "nashville", "sacramento": "sacramento",
-  "raleigh": "raleigh", "tampa": "tampa", "orlando": "orlando",
-  "pittsburgh": "pittsburgh", "kansas city": "kansascity",
-  "salt lake city": "saltlakecity", "slc": "saltlakecity",
-  "baltimore": "baltimore", "charlotte": "charlotte",
-  "indianapolis": "indianapolis", "columbus": "columbus",
-  "memphis": "memphis", "jacksonville": "jacksonville",
-  "san antonio": "sanantonio", "san jose": "sanjose",
-  "cincinnati": "cincinnati", "richmond": "richmond",
-  "new orleans": "neworleans", "st louis": "stlouis",
-  "saint louis": "stlouis", "buffalo": "buffalo",
-  "hartford": "hartford", "richmond": "richmond",
-  "norfolk": "norfolk", "virginia beach": "virginiabeach",
-  "washington": "washington", "dc": "washington", "washington dc": "washington",
-};
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -122,10 +98,11 @@ export async function GET(req: NextRequest) {
       const seen = new Set<string>();
 
       // Find all marketplace item links
-      document.querySelectorAll<HTMLAnchorElement>('a[href*="/marketplace/item/"]').forEach((a) => {
-        if (results.length >= 60) return;
+      const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href*="/marketplace/item/"]'));
+      for (const a of links) {
+        if (results.length >= 60) break;
         const href = a.href.split("?")[0];
-        if (seen.has(href)) return;
+        if (seen.has(href)) continue;
         seen.add(href);
 
         const img = a.querySelector<HTMLImageElement>("img");
@@ -153,7 +130,7 @@ export async function GET(req: NextRequest) {
         );
 
         results.push({
-          id: `fb-${i}`,
+          id: `fb-${results.length}`,
           title,
           price,
           imageUrl: img?.src ?? null,
@@ -162,7 +139,7 @@ export async function GET(req: NextRequest) {
           sourceUrl: href,
           source: "facebook" as const,
         });
-      });
+      }
 
       return results;
     });

@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { CATEGORIES } from "@/app/lib/categories";
 import type { SearchParams } from "@/app/lib/types";
+import { CLAUDE_MODEL } from "@/app/lib/config";
 
 const client = new Anthropic();
 
@@ -13,9 +14,12 @@ export async function POST(req: NextRequest) {
   if (!description?.trim()) {
     return NextResponse.json({ error: "Description is required" }, { status: 400 });
   }
+  if (description.length > 1000) {
+    return NextResponse.json({ error: "Description must be 1000 characters or fewer" }, { status: 400 });
+  }
 
   const response = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
+    model: CLAUDE_MODEL,
     max_tokens: 256,
     tools: [
       {

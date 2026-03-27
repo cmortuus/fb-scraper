@@ -46,3 +46,41 @@ export const STORE_NAMES: Record<string, string> = Object.fromEntries(
 
 // Default stores for this region
 export const DEFAULT_STORE_IDS = ["085", "151", "164"];
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+export function buildDealEmailHtml(deals: Deal[], title: string, subtitle: string): string {
+  const dealsHtml = deals
+    .map(
+      (d) => `
+    <tr>
+      <td style="padding:12px 8px;border-bottom:1px solid #eee;width:80px;vertical-align:top;">
+        ${d.imageUrl ? `<img src="${escapeHtml(d.imageUrl)}" width="80" style="border-radius:6px;" />` : ""}
+      </td>
+      <td style="padding:12px 8px;border-bottom:1px solid #eee;vertical-align:top;">
+        <a href="${escapeHtml(d.url)}" style="font-weight:600;color:#1d4ed8;text-decoration:none;font-size:14px;">${escapeHtml(d.title)}</a><br/>
+        <span style="color:#16a34a;font-size:1.1em;font-weight:700;">$${d.openBoxPrice} open box</span>
+        ${d.originalPrice ? `<span style="color:#9ca3af;margin-left:8px;text-decoration:line-through;font-size:13px;">$${d.originalPrice}</span>` : ""}
+        ${d.savingsPercent ? `<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;margin-left:8px;">${d.savingsPercent}% off${d.savingsAmount ? ` · save $${d.savingsAmount}` : ""}</span>` : ""}
+        <br/><span style="color:#9ca3af;font-size:12px;margin-top:4px;display:block;">${escapeHtml(d.store)}</span>
+      </td>
+    </tr>`
+    )
+    .join("");
+
+  return `
+    <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+      <h2 style="color:#1e293b;margin-bottom:4px;">${escapeHtml(title)}</h2>
+      <p style="color:#64748b;margin-top:0;">${escapeHtml(subtitle)}</p>
+      <table style="width:100%;border-collapse:collapse;">${dealsHtml}</table>
+      <p style="color:#94a3b8;font-size:12px;margin-top:24px;">
+        Open box items sell fast — call ahead or check microcenter.com for current availability.
+      </p>
+    </div>`;
+}

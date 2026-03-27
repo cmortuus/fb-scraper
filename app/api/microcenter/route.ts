@@ -5,6 +5,8 @@ import os from "os";
 import Anthropic from "@anthropic-ai/sdk";
 import type { Deal } from "@/app/lib/microcenter";
 import { STORE_NAMES, DEFAULT_STORE_IDS } from "@/app/lib/microcenter";
+import { CLAUDE_MODEL } from "@/app/lib/config";
+import { parsePrice } from "@/app/lib/utils";
 
 const CHROME_USER_DATA = path.join(os.homedir(), "Library/Application Support/Google/Chrome");
 const client = new Anthropic();
@@ -92,10 +94,6 @@ async function scrapeStore(
   }
 }
 
-function parsePrice(text: string): number | null {
-  const match = text.replace(/,/g, "").match(/\d+\.?\d*/);
-  return match ? parseFloat(match[0]) : null;
-}
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -105,29 +103,37 @@ export async function GET(req: NextRequest) {
 
   let context;
   try {
-    context = await chromium.launchPersistentContext(CHROME_USER_DATA, {
-      headless: true,
-      args: ["--no-sandbox", "--disable-blink-features=AutomationControlled", "--disable-dev-shm-usage"],
-      ignoreDefaultArgs: ["--enable-automation"],
-      channel: "chrome",
-    });
-  } catch {
-    context = await chromium.launchPersistentContext(
-      path.join(os.tmpdir(), "mc-session"),
-      { headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] }
-    );
+    try {
+      context = await chromium.launchPersistentContext(CHROME_USER_DATA, {
+        headless: true,
+        args: ["--no-sandbox", "--disable-blink-features=AutomationControlled", "--disable-dev-shm-usage"],
+        ignoreDefaultArgs: ["--enable-automation"],
+        channel: "chrome",
+      });
+    } catch {
+      context = await chromium.launchPersistentContext(
+        path.join(os.tmpdir(), "mc-session"),
+        { headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] }
+      );
+    }
+  } catch (err) {
+    console.error("[MicroCenter] Failed to launch browser:", err);
+    return NextResponse.json({ error: "Could not launch browser" }, { status: 500 });
   }
 
   let allRaw: Array<RawItem & { storeId: string }> = [];
 
   try {
-    // Scrape stores sequentially in the same browser context
-    for (const storeId of storeIds) {
-      try {
-        const items = await scrapeStore(context, storeId);
+    // Scrape all stores in parallel within the same browser context
+    const results = await Promise.allSettled(
+      storeIds.map((storeId) => scrapeStore(context, storeId).then((items) => ({ storeId, items })))
+    );
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        const { storeId, items } = result.value;
         allRaw = allRaw.concat(items.map((i) => ({ ...i, storeId })));
-      } catch (err) {
-        console.error(`[MicroCenter] store ${storeId} failed:`, err);
+      } else {
+        console.error(`[MicroCenter] store scrape failed:`, result.reason);
       }
     }
   } finally {
@@ -195,7 +201,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
+      model: CLAUDE_MODEL,
       max_tokens: 1024,
       tools: [
         {

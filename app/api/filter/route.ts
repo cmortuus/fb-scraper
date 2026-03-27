@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import type { Listing } from "@/app/lib/types";
+import { CLAUDE_MODEL } from "@/app/lib/config";
 
 const client = new Anthropic();
 
@@ -16,8 +17,10 @@ export async function POST(req: NextRequest) {
     .map((l, i) => `${i}: "${l.title}" — $${l.price ?? "?"} (${l.location})`)
     .join("\n");
 
-  const response = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
+  let response;
+  try {
+    response = await client.messages.create({
+    model: CLAUDE_MODEL,
     max_tokens: 2048,
     tools: [
       {
@@ -60,10 +63,14 @@ Be very strict. It is better to show 2 accurate results than 10 irrelevant ones.
       },
     ],
   });
+  } catch (err) {
+    console.error("[Filter] Claude API error:", err);
+    return NextResponse.json({ listings, filterFailed: true });
+  }
 
   const toolUse = response.content.find((b) => b.type === "tool_use");
   if (!toolUse || toolUse.type !== "tool_use") {
-    return NextResponse.json({ listings });
+    return NextResponse.json({ listings, filterFailed: true });
   }
 
   const { relevant_indices } = toolUse.input as { relevant_indices: number[] };

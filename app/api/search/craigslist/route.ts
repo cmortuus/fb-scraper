@@ -1,49 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { XMLParser } from "fast-xml-parser";
 import type { Listing } from "@/app/lib/types";
-
-// Maps common city names to their Craigslist subdomain
-const CITY_MAP: Record<string, string> = {
-  "new york": "newyork",
-  "new york city": "newyork",
-  nyc: "newyork",
-  "los angeles": "losangeles",
-  la: "losangeles",
-  "san francisco": "sfbay",
-  sf: "sfbay",
-  "bay area": "sfbay",
-  chicago: "chicago",
-  seattle: "seattle",
-  denver: "denver",
-  dallas: "dallas",
-  houston: "houston",
-  phoenix: "phoenix",
-  portland: "portland",
-  austin: "austin",
-  miami: "miami",
-  atlanta: "atlanta",
-  boston: "boston",
-  minneapolis: "minneapolis",
-  "san diego": "sandiego",
-  "las vegas": "lasvegas",
-  detroit: "detroit",
-  philadelphia: "philadelphia",
-  charlotte: "charlotte",
-  nashville: "nashville",
-  "salt lake city": "saltlakecity",
-  slc: "saltlakecity",
-  sacramento: "sacramento",
-  "san jose": "sfbay",
-  raleigh: "raleigh",
-  tampa: "tampa",
-  orlando: "orlando",
-  pittsburgh: "pittsburgh",
-  "kansas city": "kansascity",
-};
+import { CITY_TO_CL } from "@/app/lib/cities";
 
 function cityToSubdomain(location: string): string {
   const lower = location.toLowerCase().trim();
-  return CITY_MAP[lower] ?? lower.replace(/\s+/g, "");
+  return CITY_TO_CL[lower] ?? lower.replace(/\s+/g, "");
 }
 
 export async function GET(req: NextRequest) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as cheerio from "cheerio";
 import type { Listing } from "@/app/lib/types";
+import { parsePrice } from "@/app/lib/utils";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -48,8 +49,7 @@ export async function GET(req: NextRequest) {
     if (!title || title === "Shop on eBay") return;
 
     const priceText = $(el).find(".s-item__price").first().text().trim();
-    const priceMatch = priceText.match(/[\d,]+\.?\d*/);
-    const price = priceMatch ? parseFloat(priceMatch[0].replace(/,/g, "")) : null;
+    const price = parsePrice(priceText);
 
     const link = $(el).find("a.s-item__link").attr("href") ?? "";
     const image = $(el).find("img.s-item__image-img").attr("src") ?? null;
