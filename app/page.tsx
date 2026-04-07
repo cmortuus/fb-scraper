@@ -29,11 +29,16 @@ function buildCraigslistUrl(params: SearchParams): string {
   return `https://${subdomain}.craigslist.org/search/${params.craigslistCategory}?${q.toString()}`;
 }
 
+const RADIUS_OPTIONS = [5, 10, 25, 50, 100, 250, 500];
+
 export default function Home() {
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const [locationOverride, setLocationOverride] = useState("");
+  const [radiusOverride, setRadiusOverride] = useState("");
 
   const [searchParams, setSearchParams] = useState<SearchParams | null>(null);
   const [categoryLabel, setCategoryLabel] = useState("");
@@ -70,6 +75,10 @@ export default function Home() {
         params: SearchParams;
         categoryLabel: string;
       };
+      // Apply location/radius overrides if set
+      if (locationOverride.trim()) params.location = locationOverride.trim();
+      if (radiusOverride) params.radiusMiles = Number(radiusOverride);
+
       setSearchParams(params);
       setCategoryLabel(label);
       setClUrl(buildCraigslistUrl(params));
@@ -209,6 +218,27 @@ export default function Home() {
               </button>
             </div>
           </form>
+
+          {/* Location & distance overrides */}
+          <div className="mt-3 flex gap-3 items-center flex-wrap">
+            <input
+              type="text"
+              value={locationOverride}
+              onChange={(e) => setLocationOverride(e.target.value)}
+              placeholder="Location (city or zip)"
+              className="px-3 py-2 rounded-lg border border-gray-700 bg-gray-800 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-48"
+            />
+            <select
+              value={radiusOverride}
+              onChange={(e) => setRadiusOverride(e.target.value)}
+              className="px-3 py-2 rounded-lg border border-gray-700 bg-gray-800 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            >
+              <option value="">Any distance</option>
+              {RADIUS_OPTIONS.map((r) => (
+                <option key={r} value={r}>{r} miles</option>
+              ))}
+            </select>
+          </div>
 
           {!searchParams && (
             <div className="mt-3 flex flex-wrap gap-2">
