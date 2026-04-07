@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import ParsedParamsChips from "./components/ParsedParamsChips";
-import ResultsGrid from "./components/ResultsGrid";
+import ListingCard from "./components/ListingCard";
 import type { Listing, SearchParams } from "./lib/types";
+import type { SavedFinderSearch } from "./lib/saved-finder-searches";
 import { CITY_TO_CL } from "./lib/cities";
 
 type Source = "all" | "craigslist" | "ebay" | "facebook";
@@ -17,19 +18,28 @@ const EXAMPLE_SEARCHES = [
 
 function buildCraigslistUrl(params: SearchParams): string {
   const locationKey = (params.location ?? "").toLowerCase().trim();
-  const subdomain = (CITY_TO_CL[locationKey] ?? locationKey.replace(/\s+/g, "")) || "sfbay";
   const q = new URLSearchParams({ query: params.keywords });
   if (params.minPrice) q.set("min_price", String(params.minPrice));
   if (params.maxPrice) q.set("max_price", String(params.maxPrice));
   if (params.radiusMiles) q.set("search_distance", String(params.radiusMiles));
+  if (!locationKey) {
+    // No location — use Craigslist's national search
+    return `https://www.craigslist.org/search/${params.craigslistCategory}?${q.toString()}`;
+  }
+  const subdomain = CITY_TO_CL[locationKey] ?? locationKey.replace(/\s+/g, "");
   return `https://${subdomain}.craigslist.org/search/${params.craigslistCategory}?${q.toString()}`;
 }
+
+const RADIUS_OPTIONS = [5, 10, 25, 50, 100, 250, 500];
 
 export default function Home() {
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const [locationOverride, setLocationOverride] = useState("");
+  const [radiusOverride, setRadiusOverride] = useState("");
 
   const [searchParams, setSearchParams] = useState<SearchParams | null>(null);
   const [categoryLabel, setCategoryLabel] = useState("");
@@ -39,6 +49,77 @@ export default function Home() {
   const [clUrl, setClUrl] = useState("");
   const [activeSource, setActiveSource] = useState<Source>("all");
   const [sourceErrors, setSourceErrors] = useState<string[]>([]);
+
+  // Saved searches
+  const [savedSearches, setSavedSearches] = useState<SavedFinderSearch[]>([]);
+  const [saveName, setSaveName] = useState("");
+  const [saveEmail, setSaveEmail] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [runningId, setRunningId] = useState<string | null>(null);
+  const [runStatus, setRunStatus] = useState<Record<string, string>>({});
+
+  const loadSaved = useCallback(async () => {
+    try {
+      const res = await fetch("/api/finder/saved");
+      setSavedSearches(await res.json());
+    } catch {}
+  }, []);
+
+  useEffect(() => { loadSaved(); }, [loadSaved]);
+
+  async function saveSearch() {
+    if (!saveName || !saveEmail || !description.trim()) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await fetch("/api/finder/saved", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: saveName,
+          description: description.trim(),
+          email: saveEmail,
+          location: locationOverride.trim() || undefined,
+          radiusMiles: radiusOverride ? Number(radiusOverride) : undefined,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setSaveError(data.error ?? "Failed to save");
+      } else {
+        setSaveName("");
+        loadSaved();
+      }
+    } catch {
+      setSaveError("Failed to reach server");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteSavedSearch(id: string) {
+    if (!window.confirm("Delete this saved search?")) return;
+    await fetch(`/api/finder/saved?id=${id}`, { method: "DELETE" });
+    loadSaved();
+  }
+
+  async function runSavedSearch(s: SavedFinderSearch) {
+    setRunningId(s.id);
+    setRunStatus((prev) => ({ ...prev, [s.id]: "Running..." }));
+    try {
+      const res = await fetch(`/api/finder/saved/run?id=${s.id}`, { method: "POST" });
+      const data = await res.json();
+      if (data.error) setRunStatus((prev) => ({ ...prev, [s.id]: `Error: ${data.error}` }));
+      else if (!data.sent) setRunStatus((prev) => ({ ...prev, [s.id]: data.message ?? "No results" }));
+      else setRunStatus((prev) => ({ ...prev, [s.id]: `Emailed ${data.resultsFound} listing${data.resultsFound !== 1 ? "s" : ""}` }));
+    } catch {
+      setRunStatus((prev) => ({ ...prev, [s.id]: "Failed" }));
+    } finally {
+      setRunningId(null);
+      loadSaved();
+    }
+  }
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -66,6 +147,10 @@ export default function Home() {
         params: SearchParams;
         categoryLabel: string;
       };
+      // Apply location/radius overrides if set
+      if (locationOverride.trim()) params.location = locationOverride.trim();
+      if (radiusOverride) params.radiusMiles = Number(radiusOverride);
+
       setSearchParams(params);
       setCategoryLabel(label);
       setClUrl(buildCraigslistUrl(params));
@@ -169,15 +254,15 @@ export default function Home() {
     : listings.filter((l) => l.source === activeSource);
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-gray-950">
       {/* Header */}
-      <div className="bg-white border-b border-gray-100 shadow-sm">
+      <div className="bg-gray-900 border-b border-gray-800 shadow-sm">
         <div className="max-w-5xl mx-auto px-4 py-6">
           <div className="flex items-center gap-3 mb-1">
             <span className="text-3xl">🔍</span>
-            <h1 className="text-2xl font-bold text-gray-900">Used Finder</h1>
+            <h1 className="text-2xl font-bold text-gray-100">Used Finder</h1>
           </div>
-          <p className="text-gray-500 text-sm ml-11">
+          <p className="text-gray-400 text-sm ml-11">
             Describe what you&apos;re looking for — searches eBay & Facebook Marketplace inline, Craigslist via link.
           </p>
 
@@ -188,7 +273,7 @@ export default function Home() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="e.g. Used squat rack under $300 near Seattle, decent condition"
                 rows={2}
-                className="flex-1 resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent shadow-sm"
+                className="flex-1 resize-none rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -206,14 +291,35 @@ export default function Home() {
             </div>
           </form>
 
+          {/* Location & distance overrides */}
+          <div className="mt-3 flex gap-3 items-center flex-wrap">
+            <input
+              type="text"
+              value={locationOverride}
+              onChange={(e) => setLocationOverride(e.target.value)}
+              placeholder="Location (city or zip)"
+              className="px-3 py-2 rounded-lg border border-gray-700 bg-gray-800 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-48"
+            />
+            <select
+              value={radiusOverride}
+              onChange={(e) => setRadiusOverride(e.target.value)}
+              className="px-3 py-2 rounded-lg border border-gray-700 bg-gray-800 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            >
+              <option value="">Any distance</option>
+              {RADIUS_OPTIONS.map((r) => (
+                <option key={r} value={r}>{r} miles</option>
+              ))}
+            </select>
+          </div>
+
           {!searchParams && (
             <div className="mt-3 flex flex-wrap gap-2">
-              <span className="text-xs text-gray-400 self-center">Try:</span>
+              <span className="text-xs text-gray-500 self-center">Try:</span>
               {EXAMPLE_SEARCHES.map((ex) => (
                 <button
                   key={ex}
                   onClick={() => setDescription(ex)}
-                  className="text-xs text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded-full transition-colors"
+                  className="text-xs text-indigo-400 hover:text-indigo-300 bg-indigo-950 hover:bg-indigo-900 px-3 py-1 rounded-full transition-colors"
                 >
                   {ex}
                 </button>
@@ -231,16 +337,16 @@ export default function Home() {
       <div className="max-w-5xl mx-auto px-4 py-6">
         {loading && (
           <div className="text-center py-16">
-            <div className="inline-block w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4" />
-            <p className="text-gray-500">{loadingStep}</p>
+            <div className="inline-block w-8 h-8 border-4 border-indigo-900 border-t-indigo-400 rounded-full animate-spin mb-4" />
+            <p className="text-gray-400">{loadingStep}</p>
             {loadingStep.includes("Facebook") && (
-              <p className="text-xs text-gray-400 mt-2">Facebook takes ~10s (launching browser)</p>
+              <p className="text-xs text-gray-500 mt-2">Facebook takes ~10s (launching browser)</p>
             )}
           </div>
         )}
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+          <div className="bg-red-900/30 border border-red-800 text-red-300 rounded-xl px-4 py-3 text-sm">
             {error}
           </div>
         )}
@@ -248,7 +354,7 @@ export default function Home() {
         {sourceErrors.length > 0 && (
           <div className="mb-4 space-y-1">
             {sourceErrors.map((e) => (
-              <div key={e} className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+              <div key={e} className="text-xs text-amber-400 bg-amber-900/30 border border-amber-800 rounded-lg px-3 py-2">
                 ⚠️ {e}
               </div>
             ))}
@@ -256,7 +362,7 @@ export default function Home() {
         )}
 
         {filterFailed && !loading && (
-          <div className="mb-4 text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+          <div className="mb-4 text-xs text-amber-400 bg-amber-900/30 border border-amber-800 rounded-lg px-3 py-2">
             ⚠️ Relevance filtering unavailable — showing all {rawCount} raw results
           </div>
         )}
@@ -265,19 +371,19 @@ export default function Home() {
           <>
             {/* Source tabs */}
             {listings.length > 0 && (
-              <div className="flex gap-1 mb-5 border-b border-gray-200">
+              <div className="flex gap-1 mb-5 border-b border-gray-800">
                 {sourceTabs.map((tab) => (
                   <button
                     key={tab.key}
                     onClick={() => setActiveSource(tab.key)}
                     className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
                       activeSource === tab.key
-                        ? "border-indigo-600 text-indigo-600"
-                        : "border-transparent text-gray-500 hover:text-gray-700"
+                        ? "border-indigo-400 text-indigo-400"
+                        : "border-transparent text-gray-500 hover:text-gray-300"
                     }`}
                   >
                     {tab.label}
-                    <span className="ml-1.5 text-xs text-gray-400">({counts[tab.key]})</span>
+                    <span className="ml-1.5 text-xs text-gray-500">({counts[tab.key]})</span>
                   </button>
                 ))}
               </div>
@@ -287,49 +393,11 @@ export default function Home() {
             {filtered.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {filtered.map((listing) => (
-                  <a
-                    key={listing.id}
-                    href={listing.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group flex flex-col bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-gray-200 transition-all overflow-hidden"
-                  >
-                    <div className="h-44 bg-gray-100 flex items-center justify-center overflow-hidden">
-                      {listing.imageUrl ? (
-                        <img
-                          src={listing.imageUrl}
-                          alt={listing.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      ) : (
-                        <span className="text-4xl text-gray-300">📦</span>
-                      )}
-                    </div>
-                    <div className="p-4 flex flex-col gap-2 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-medium text-gray-900 line-clamp-2 leading-snug flex-1">
-                          {listing.title}
-                        </p>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${
-                          listing.source === "ebay"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : "bg-blue-100 text-blue-800"
-                        }`}>
-                          {listing.source === "ebay" ? "eBay" : "Facebook"}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between mt-auto pt-2">
-                        <span className="text-lg font-bold text-gray-900">
-                          {listing.price != null ? `$${listing.price.toLocaleString()}` : "Price N/A"}
-                        </span>
-                        <span className="text-xs text-gray-400">{listing.location}</span>
-                      </div>
-                    </div>
-                  </a>
+                  <ListingCard key={listing.id} listing={listing} />
                 ))}
               </div>
             ) : (
-              <div className="text-center py-10 text-gray-400">
+              <div className="text-center py-10 text-gray-500">
                 {rawCount > 0 && !filterFailed
                   ? <p>{rawCount} listing{rawCount !== 1 ? "s" : ""} found, but none matched your criteria after filtering. Try broadening your search.</p>
                   : <p>No results found. Try broadening your search or a different location.</p>
@@ -344,12 +412,12 @@ export default function Home() {
                   href={clUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-4 bg-white border border-gray-200 rounded-2xl px-6 py-4 hover:border-indigo-300 hover:shadow-md transition-all"
+                  className="flex items-center gap-4 bg-gray-900 border border-gray-800 rounded-2xl px-6 py-4 hover:border-indigo-600 hover:shadow-md transition-all"
                 >
                   <span className="text-2xl">🏷️</span>
                   <div>
-                    <p className="font-semibold text-gray-900">Craigslist</p>
-                    <p className="text-sm text-gray-400">Open pre-filled search (blocks automated access) ↗</p>
+                    <p className="font-semibold text-gray-100">Craigslist</p>
+                    <p className="text-sm text-gray-500">Open pre-filled search (blocks automated access) ↗</p>
                   </div>
                 </a>
               </div>
@@ -360,8 +428,97 @@ export default function Home() {
         {!loading && !searchParams && (
           <div className="text-center py-20">
             <div className="text-7xl mb-4">🛒</div>
-            <p className="text-xl font-medium text-gray-400">Describe what you&apos;re looking for above</p>
-            <p className="text-sm mt-2 text-gray-300">Searches eBay & Facebook Marketplace inline</p>
+            <p className="text-xl font-medium text-gray-500">Describe what you&apos;re looking for above</p>
+            <p className="text-sm mt-2 text-gray-600">Searches eBay & Facebook Marketplace inline</p>
+          </div>
+        )}
+
+        {/* Save current search */}
+        {description.trim() && !loading && (
+          <div className="mt-8 bg-gray-900/50 border border-gray-800 rounded-2xl p-5">
+            <p className="text-sm font-semibold text-gray-200 mb-1">Save this search for alerts</p>
+            <p className="text-xs text-gray-400 mb-3">
+              Get notified by email when new listings match your search.
+            </p>
+            <div className="flex gap-3 flex-wrap">
+              <input
+                type="text"
+                placeholder="Name (e.g. Gym equipment)"
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                className="border border-gray-700 rounded-lg px-3 py-2 text-sm flex-1 min-w-40 bg-gray-800 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <input
+                type="email"
+                placeholder="your@email.com"
+                value={saveEmail}
+                onChange={(e) => setSaveEmail(e.target.value)}
+                className="border border-gray-700 rounded-lg px-3 py-2 text-sm flex-1 min-w-48 bg-gray-800 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <button
+                onClick={saveSearch}
+                disabled={!saveName || !saveEmail || saving}
+                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold px-5 py-2 rounded-lg transition-colors text-sm whitespace-nowrap"
+              >
+                {saving ? "Saving..." : "Save Search"}
+              </button>
+            </div>
+            {saveError && <p className="mt-2 text-xs text-red-400">{saveError}</p>}
+          </div>
+        )}
+
+        {/* Saved searches list */}
+        {savedSearches.length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-base font-semibold text-gray-200 mb-3">Saved Searches</h2>
+            <div className="flex flex-col gap-3">
+              {savedSearches.map((s) => (
+                <div key={s.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-100 text-sm">{s.name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">
+                      &ldquo;{s.description}&rdquo;
+                      {s.location && ` · ${s.location}`}
+                      {s.radiusMiles && ` · ${s.radiusMiles}mi`}
+                      {` · ${s.email}`}
+                    </p>
+                    {s.lastRun && (
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Last run: {new Date(s.lastRun).toLocaleString()} · {s.lastResultCount ?? 0} result{s.lastResultCount !== 1 ? "s" : ""}
+                      </p>
+                    )}
+                    {runStatus[s.id] && (
+                      <p className="text-xs text-indigo-400 mt-1 font-medium">{runStatus[s.id]}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => {
+                        setDescription(s.description);
+                        if (s.location) setLocationOverride(s.location);
+                        if (s.radiusMiles) setRadiusOverride(String(s.radiusMiles));
+                      }}
+                      className="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      Load
+                    </button>
+                    <button
+                      onClick={() => runSavedSearch(s)}
+                      disabled={runningId === s.id}
+                      className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-800 disabled:text-indigo-400 text-white text-xs font-semibold px-4 py-1.5 rounded-lg transition-colors"
+                    >
+                      {runningId === s.id ? "Running..." : "Run & Email"}
+                    </button>
+                    <button
+                      onClick={() => deleteSavedSearch(s.id)}
+                      className="text-xs text-red-400 hover:text-red-300 px-2 py-1.5 rounded-lg hover:bg-red-900/30 transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
