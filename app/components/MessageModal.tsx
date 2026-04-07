@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { api } from "@/app/lib/api";
 
 interface Props {
   listingUrl: string;
@@ -16,7 +17,7 @@ export default function MessageModal({ listingUrl, listingTitle, onClose }: Prop
     setSending(true);
     setResult(null);
     try {
-      const res = await fetch("/api/facebook/message", {
+      const res = await fetch(api("/api/facebook/message"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ listingUrl, message }),

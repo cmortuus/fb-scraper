@@ -6,6 +6,7 @@ import BrowseListingCard from "./components/BrowseListingCard";
 import CategoryFilter from "./components/CategoryFilter";
 import CitySelector from "./components/CitySelector";
 import ListingSkeleton from "./components/ListingSkeleton";
+import { api } from "@/app/lib/api";
 
 const STORAGE_KEY = "browse-city";
 
@@ -44,7 +45,7 @@ export default function BrowsePage() {
       if (searchQuery) params.set("query", searchQuery);
 
       try {
-        const res = await fetch(`/api/browse/facebook?${params}`, {
+        const res = await fetch(api(`/api/browse/facebook?${params}`), {
           signal: controller.signal,
         });
         const data = await res.json();

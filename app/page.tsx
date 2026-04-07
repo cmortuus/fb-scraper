@@ -6,6 +6,7 @@ import ListingCard from "./components/ListingCard";
 import type { Listing, SearchParams } from "./lib/types";
 import type { SavedFinderSearch } from "./lib/saved-finder-searches";
 import { CITY_TO_CL } from "./lib/cities";
+import { api } from "./lib/api";
 
 type Source = "all" | "craigslist" | "ebay" | "facebook";
 
@@ -62,7 +63,7 @@ export default function Home() {
 
   const loadSaved = useCallback(async () => {
     try {
-      const res = await fetch("/api/finder/saved");
+      const res = await fetch(api("/api/finder/saved"));
       setSavedSearches(await res.json());
     } catch {}
   }, []);
@@ -74,7 +75,7 @@ export default function Home() {
     setSaving(true);
     setSaveError(null);
     try {
-      const res = await fetch("/api/finder/saved", {
+      const res = await fetch(api("/api/finder/saved"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -101,7 +102,7 @@ export default function Home() {
 
   async function deleteSavedSearch(id: string) {
     if (!window.confirm("Delete this saved search?")) return;
-    await fetch(`/api/finder/saved?id=${id}`, { method: "DELETE" });
+    await fetch(api(`/api/finder/saved?id=${id}`), { method: "DELETE" });
     loadSaved();
   }
 
@@ -109,7 +110,7 @@ export default function Home() {
     setRunningId(s.id);
     setRunStatus((prev) => ({ ...prev, [s.id]: "Running..." }));
     try {
-      const res = await fetch(`/api/finder/saved/run?id=${s.id}`, { method: "POST" });
+      const res = await fetch(api(`/api/finder/saved/run?id=${s.id}`), { method: "POST" });
       const data = await res.json();
       if (data.error) setRunStatus((prev) => ({ ...prev, [s.id]: `Error: ${data.error}` }));
       else if (!data.sent) setRunStatus((prev) => ({ ...prev, [s.id]: data.message ?? "No results" }));
@@ -138,7 +139,7 @@ export default function Home() {
     try {
       // Step 1: Parse with Claude
       setLoadingStep("Understanding your search...");
-      const parseRes = await fetch("/api/parse", {
+      const parseRes = await fetch(api("/api/parse"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ description }),
@@ -180,11 +181,11 @@ export default function Home() {
       });
 
       const fbEndpoint = isNationwide
-        ? `/api/search/facebook/nationwide?${fbParams}`
-        : `/api/search/facebook?${fbParams}`;
+        ? api(`/api/search/facebook/nationwide?${fbParams}`)
+        : api(`/api/search/facebook?${fbParams}`);
 
       const [ebayResult, fbResult] = await Promise.allSettled([
-        fetch(`/api/search/ebay?${ebayParams}`).then((r) => r.json()),
+        fetch(api(`/api/search/ebay?${ebayParams}`)).then((r) => r.json()),
         fetch(fbEndpoint).then((r) => r.json()),
       ]);
 
@@ -211,7 +212,7 @@ export default function Home() {
       let relevantListings = allListings;
       if (allListings.length > 0) {
         try {
-          const filterRes = await fetch("/api/filter", {
+          const filterRes = await fetch(api("/api/filter"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ listings: allListings, description }),
