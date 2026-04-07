@@ -6,6 +6,7 @@ import ListingCard from "./components/ListingCard";
 import type { Listing, SearchParams } from "./lib/types";
 import type { SavedFinderSearch } from "./lib/saved-finder-searches";
 import { CITY_TO_CL } from "./lib/cities";
+import { api } from "./lib/api";
 
 type Source = "all" | "craigslist" | "ebay" | "facebook";
 
@@ -40,6 +41,7 @@ export default function Home() {
 
   const [locationOverride, setLocationOverride] = useState("");
   const [radiusOverride, setRadiusOverride] = useState("");
+  const [nationwideMode, setNationwideMode] = useState(false);
 
   const [searchParams, setSearchParams] = useState<SearchParams | null>(null);
   const [categoryLabel, setCategoryLabel] = useState("");
@@ -61,7 +63,7 @@ export default function Home() {
 
   const loadSaved = useCallback(async () => {
     try {
-      const res = await fetch("/api/finder/saved");
+      const res = await fetch(api("/api/finder/saved"));
       setSavedSearches(await res.json());
     } catch {}
   }, []);
@@ -73,7 +75,7 @@ export default function Home() {
     setSaving(true);
     setSaveError(null);
     try {
-      const res = await fetch("/api/finder/saved", {
+      const res = await fetch(api("/api/finder/saved"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -100,7 +102,7 @@ export default function Home() {
 
   async function deleteSavedSearch(id: string) {
     if (!window.confirm("Delete this saved search?")) return;
-    await fetch(`/api/finder/saved?id=${id}`, { method: "DELETE" });
+    await fetch(api(`/api/finder/saved?id=${id}`), { method: "DELETE" });
     loadSaved();
   }
 
@@ -108,7 +110,7 @@ export default function Home() {
     setRunningId(s.id);
     setRunStatus((prev) => ({ ...prev, [s.id]: "Running..." }));
     try {
-      const res = await fetch(`/api/finder/saved/run?id=${s.id}`, { method: "POST" });
+      const res = await fetch(api(`/api/finder/saved/run?id=${s.id}`), { method: "POST" });
       const data = await res.json();
       if (data.error) setRunStatus((prev) => ({ ...prev, [s.id]: `Error: ${data.error}` }));
       else if (!data.sent) setRunStatus((prev) => ({ ...prev, [s.id]: data.message ?? "No results" }));
@@ -137,7 +139,7 @@ export default function Home() {
     try {
       // Step 1: Parse with Claude
       setLoadingStep("Understanding your search...");
-      const parseRes = await fetch("/api/parse", {
+      const parseRes = await fetch(api("/api/parse"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ description }),
@@ -156,7 +158,12 @@ export default function Home() {
       setClUrl(buildCraigslistUrl(params));
 
       // Step 2: Fetch eBay + Facebook Marketplace in parallel
-      setLoadingStep("Searching eBay & Facebook Marketplace...");
+      const isNationwide = nationwideMode && !params.location;
+      setLoadingStep(
+        isNationwide
+          ? "Searching eBay & Facebook Marketplace nationwide (this takes a while)..."
+          : "Searching eBay & Facebook Marketplace..."
+      );
 
       const ebayParams = new URLSearchParams({
         keywords: params.keywords,
@@ -173,9 +180,13 @@ export default function Home() {
         ...(params.radiusMiles ? { radiusMiles: String(params.radiusMiles) } : {}),
       });
 
+      const fbEndpoint = isNationwide
+        ? api(`/api/search/facebook/nationwide?${fbParams}`)
+        : api(`/api/search/facebook?${fbParams}`);
+
       const [ebayResult, fbResult] = await Promise.allSettled([
-        fetch(`/api/search/ebay?${ebayParams}`).then((r) => r.json()),
-        fetch(`/api/search/facebook?${fbParams}`).then((r) => r.json()),
+        fetch(api(`/api/search/ebay?${ebayParams}`)).then((r) => r.json()),
+        fetch(fbEndpoint).then((r) => r.json()),
       ]);
 
       const allListings: Listing[] = [];
@@ -201,7 +212,7 @@ export default function Home() {
       let relevantListings = allListings;
       if (allListings.length > 0) {
         try {
-          const filterRes = await fetch("/api/filter", {
+          const filterRes = await fetch(api("/api/filter"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ listings: allListings, description }),
@@ -292,25 +303,43 @@ export default function Home() {
           </form>
 
           {/* Location & distance overrides */}
-          <div className="mt-3 flex gap-3 items-center flex-wrap">
-            <input
-              type="text"
-              value={locationOverride}
-              onChange={(e) => setLocationOverride(e.target.value)}
-              placeholder="Location (city or zip)"
-              className="px-3 py-2 rounded-lg border border-gray-700 bg-gray-800 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-48"
-            />
-            <select
-              value={radiusOverride}
-              onChange={(e) => setRadiusOverride(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-gray-700 bg-gray-800 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            >
-              <option value="">Any distance</option>
-              {RADIUS_OPTIONS.map((r) => (
-                <option key={r} value={r}>{r} miles</option>
-              ))}
-            </select>
+          <div className="mt-3 flex flex-col sm:flex-row gap-3 sm:items-center">
+            <div className="flex gap-3 items-center">
+              <input
+                type="text"
+                value={locationOverride}
+                onChange={(e) => setLocationOverride(e.target.value)}
+                placeholder="Location (city or zip)"
+                disabled={nationwideMode}
+                className="px-3 py-2 rounded-lg border border-gray-700 bg-gray-800 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent flex-1 sm:flex-none sm:w-48 disabled:opacity-40"
+              />
+              <select
+                value={radiusOverride}
+                onChange={(e) => setRadiusOverride(e.target.value)}
+                disabled={nationwideMode}
+                className="px-3 py-2 rounded-lg border border-gray-700 bg-gray-800 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-40"
+              >
+                <option value="">Any distance</option>
+                {RADIUS_OPTIONS.map((r) => (
+                  <option key={r} value={r}>{r} miles</option>
+                ))}
+              </select>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={nationwideMode}
+                onChange={(e) => setNationwideMode(e.target.checked)}
+                className="w-4 h-4 rounded accent-indigo-500"
+              />
+              <span className="text-sm text-gray-300 font-medium">Nationwide</span>
+            </label>
           </div>
+          {nationwideMode && (
+            <p className="mt-1 text-xs text-indigo-400">
+              Searches Facebook Marketplace across 15 major US cities. Takes longer (~2-3 min).
+            </p>
+          )}
 
           {!searchParams && (
             <div className="mt-3 flex flex-wrap gap-2">

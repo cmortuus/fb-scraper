@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   const search = searches[idx];
 
   const baseUrl = new URL(req.url);
-  const host = `${baseUrl.protocol}//${baseUrl.host}`;
+  const host = `${baseUrl.protocol}//${baseUrl.host}/market`;
 
   try {
     // Step 1: Parse the search description with Claude

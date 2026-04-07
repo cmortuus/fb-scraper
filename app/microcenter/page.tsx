@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Deal, SavedSearch } from "@/app/lib/microcenter";
 import { STORES, DEFAULT_STORE_IDS } from "@/app/lib/microcenter";
+import { api } from "@/app/lib/api";
 
 // Stores shown in the quick-select area (others still available via saved searches)
 const QUICK_STORES = {
@@ -32,7 +33,7 @@ export default function MicroCenterPage() {
   const [runStatus, setRunStatus] = useState<Record<string, string>>({});
 
   const loadSaved = useCallback(async () => {
-    const res = await fetch("/api/microcenter/saved");
+    const res = await fetch(api("/api/microcenter/saved"));
     setSavedSearches(await res.json());
   }, []);
 
@@ -55,7 +56,7 @@ export default function MicroCenterPage() {
         storeIds: selectedStores.join(","),
         minSavings: String(minSavings),
       });
-      const res = await fetch(`/api/microcenter?${params}`);
+      const res = await fetch(api(`/api/microcenter?${params}`));
       const data = await res.json();
       if (data.error && !data.deals?.length) setError(data.error);
       else {
@@ -75,7 +76,7 @@ export default function MicroCenterPage() {
     setSaving(true);
     setSaveError(null);
     try {
-      const res = await fetch("/api/microcenter/saved", {
+      const res = await fetch(api("/api/microcenter/saved"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -102,7 +103,7 @@ export default function MicroCenterPage() {
 
   async function deleteSearch(id: string) {
     if (!window.confirm("Delete this saved search?")) return;
-    const res = await fetch(`/api/microcenter/saved?id=${id}`, { method: "DELETE" });
+    const res = await fetch(api(`/api/microcenter/saved?id=${id}`), { method: "DELETE" });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       alert(data.error ?? "Failed to delete search");
@@ -115,7 +116,7 @@ export default function MicroCenterPage() {
     setRunningId(s.id);
     setRunStatus((prev) => ({ ...prev, [s.id]: "Running..." }));
     try {
-      const res = await fetch(`/api/microcenter/saved/run?id=${s.id}`, { method: "POST" });
+      const res = await fetch(api(`/api/microcenter/saved/run?id=${s.id}`), { method: "POST" });
       const data = await res.json();
       if (data.error) setRunStatus((prev) => ({ ...prev, [s.id]: `Error: ${data.error}` }));
       else if (!data.sent) setRunStatus((prev) => ({ ...prev, [s.id]: data.message ?? "No deals found" }));
@@ -272,7 +273,7 @@ export default function MicroCenterPage() {
         )}
         <p className="text-xs text-gray-500 mt-3">
           Requires <code className="bg-gray-800 px-1 rounded">GMAIL_USER</code> + <code className="bg-gray-800 px-1 rounded">GMAIL_APP_PASSWORD</code> in <code className="bg-gray-800 px-1 rounded">.env.local</code> to send email.
-          For daily alerts: <code className="bg-gray-800 px-1 rounded text-[11px]">crontab -e</code> → add <code className="bg-gray-800 px-1 rounded text-[11px]">0 9 * * * curl -s -X POST http://localhost:3000/api/microcenter/saved/run?id=SEARCH_ID</code>
+          For daily alerts: <code className="bg-gray-800 px-1 rounded text-[11px]">crontab -e</code> → add <code className="bg-gray-800 px-1 rounded text-[11px]">0 9 * * * curl -s -X POST http://localhost:3000/market/api/microcenter/saved/run?id=SEARCH_ID</code>
         </p>
       </div>
 

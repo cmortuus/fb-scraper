@@ -33,8 +33,17 @@ export async function POST(req: NextRequest) {
     minSavings: String(search.minSavings),
   });
   const baseUrl = new URL(req.url);
-  const dealRes = await fetch(`${baseUrl.protocol}//${baseUrl.host}/api/microcenter?${params}`);
-  const { deals }: { deals: Deal[] } = await dealRes.json();
+  let deals: Deal[];
+  try {
+    const dealRes = await fetch(`${baseUrl.protocol}//${baseUrl.host}/market/api/microcenter?${params}`);
+    if (!dealRes.ok) {
+      const err = await dealRes.json().catch(() => ({}));
+      return NextResponse.json({ error: err.error ?? "Failed to fetch deals" }, { status: 502 });
+    }
+    ({ deals } = await dealRes.json());
+  } catch {
+    return NextResponse.json({ error: "Failed to reach MicroCenter API" }, { status: 502 });
+  }
 
   const worthIt = (deals ?? []).filter((d) => d.worthIt);
 
@@ -63,16 +72,20 @@ export async function POST(req: NextRequest) {
 
   const maxSavings = Math.max(...worthIt.map((d) => d.savingsPercent ?? 0));
 
-  await transporter.sendMail({
-    from: `"MicroCenter Deals" <${gmailUser}>`,
-    to: search.email,
-    subject: `🔥 ${worthIt.length} open box deal${worthIt.length > 1 ? "s" : ""} — up to ${maxSavings}% off · ${search.name}`,
-    html: buildDealEmailHtml(
-      worthIt,
-      "MicroCenter Open Box Deals",
-      `${search.name} · ${worthIt.length} deal${worthIt.length > 1 ? "s" : ""} found`
-    ),
-  });
+  try {
+    await transporter.sendMail({
+      from: `"MicroCenter Deals" <${gmailUser}>`,
+      to: search.email,
+      subject: `🔥 ${worthIt.length} open box deal${worthIt.length > 1 ? "s" : ""} — up to ${maxSavings}% off · ${search.name}`,
+      html: buildDealEmailHtml(
+        worthIt,
+        "MicroCenter Open Box Deals",
+        `${search.name} · ${worthIt.length} deal${worthIt.length > 1 ? "s" : ""} found`
+      ),
+    });
+  } catch {
+    return NextResponse.json({ error: "Failed to send email — check GMAIL credentials", dealsFound: worthIt.length }, { status: 500 });
+  }
 
   return NextResponse.json({ sent: true, dealsFound: worthIt.length });
 }
