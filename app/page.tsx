@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import ParsedParamsChips from "./components/ParsedParamsChips";
-import ResultsGrid from "./components/ResultsGrid";
+import ListingCard from "./components/ListingCard";
 import type { Listing, SearchParams } from "./lib/types";
 import { CITY_TO_CL } from "./lib/cities";
 
@@ -321,45 +321,7 @@ export default function Home() {
             {filtered.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {filtered.map((listing) => (
-                  <a
-                    key={listing.id}
-                    href={listing.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group flex flex-col bg-gray-900 rounded-2xl shadow-sm border border-gray-800 hover:shadow-md hover:border-gray-700 transition-all overflow-hidden"
-                  >
-                    <div className="h-44 bg-gray-800 flex items-center justify-center overflow-hidden">
-                      {listing.imageUrl ? (
-                        <img
-                          src={listing.imageUrl}
-                          alt={listing.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      ) : (
-                        <span className="text-4xl text-gray-600">📦</span>
-                      )}
-                    </div>
-                    <div className="p-4 flex flex-col gap-2 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-medium text-gray-100 line-clamp-2 leading-snug flex-1">
-                          {listing.title}
-                        </p>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${
-                          listing.source === "ebay"
-                            ? "bg-yellow-900/40 text-yellow-300"
-                            : "bg-blue-900/40 text-blue-300"
-                        }`}>
-                          {listing.source === "ebay" ? "eBay" : "Facebook"}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between mt-auto pt-2">
-                        <span className="text-lg font-bold text-gray-100">
-                          {listing.price != null ? `$${listing.price.toLocaleString()}` : "Price N/A"}
-                        </span>
-                        <span className="text-xs text-gray-500">{listing.location}</span>
-                      </div>
-                    </div>
-                  </a>
+                  <ListingCard key={listing.id} listing={listing} />
                 ))}
               </div>
             ) : (
