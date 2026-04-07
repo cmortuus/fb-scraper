@@ -110,3 +110,39 @@ export const CITY_TO_FB: Record<string, string> = {
   dc: "washington",
   "washington dc": "washington",
 };
+
+/**
+ * Representative cities spread across the US for nationwide Facebook search.
+ * Each entry is [displayName, fbSlug]. Covers major metro regions.
+ */
+export const NATIONWIDE_FB_CITIES: [string, string][] = [
+  ["New York", "nyc"],
+  ["Los Angeles", "la"],
+  ["Chicago", "chicago"],
+  ["Houston", "houston"],
+  ["Phoenix", "phoenix"],
+  ["Seattle", "seattle"],
+  ["Denver", "denver"],
+  ["Atlanta", "atlanta"],
+  ["Miami", "miami"],
+  ["Dallas", "dallas"],
+  ["Boston", "boston"],
+  ["Minneapolis", "minneapolis"],
+  ["Philadelphia", "philadelphia"],
+  ["Nashville", "nashville"],
+  ["Portland", "portland"],
+];
+
+/** Deduplicated, sorted city options for the browse page dropdown */
+export const FB_CITY_OPTIONS: { label: string; slug: string }[] = (() => {
+  const seen = new Set<string>();
+  const options: { label: string; slug: string }[] = [];
+  for (const [name, slug] of Object.entries(CITY_TO_FB)) {
+    if (seen.has(slug)) continue;
+    seen.add(slug);
+    // Capitalize each word for the label
+    const label = name.replace(/\b\w/g, (c) => c.toUpperCase());
+    options.push({ label, slug });
+  }
+  return options.sort((a, b) => a.label.localeCompare(b.label));
+})();

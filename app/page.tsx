@@ -40,6 +40,7 @@ export default function Home() {
 
   const [locationOverride, setLocationOverride] = useState("");
   const [radiusOverride, setRadiusOverride] = useState("");
+  const [nationwideMode, setNationwideMode] = useState(false);
 
   const [searchParams, setSearchParams] = useState<SearchParams | null>(null);
   const [categoryLabel, setCategoryLabel] = useState("");
@@ -156,7 +157,12 @@ export default function Home() {
       setClUrl(buildCraigslistUrl(params));
 
       // Step 2: Fetch eBay + Facebook Marketplace in parallel
-      setLoadingStep("Searching eBay & Facebook Marketplace...");
+      const isNationwide = nationwideMode && !params.location;
+      setLoadingStep(
+        isNationwide
+          ? "Searching eBay & Facebook Marketplace nationwide (this takes a while)..."
+          : "Searching eBay & Facebook Marketplace..."
+      );
 
       const ebayParams = new URLSearchParams({
         keywords: params.keywords,
@@ -173,9 +179,13 @@ export default function Home() {
         ...(params.radiusMiles ? { radiusMiles: String(params.radiusMiles) } : {}),
       });
 
+      const fbEndpoint = isNationwide
+        ? `/api/search/facebook/nationwide?${fbParams}`
+        : `/api/search/facebook?${fbParams}`;
+
       const [ebayResult, fbResult] = await Promise.allSettled([
         fetch(`/api/search/ebay?${ebayParams}`).then((r) => r.json()),
-        fetch(`/api/search/facebook?${fbParams}`).then((r) => r.json()),
+        fetch(fbEndpoint).then((r) => r.json()),
       ]);
 
       const allListings: Listing[] = [];
@@ -298,19 +308,35 @@ export default function Home() {
               value={locationOverride}
               onChange={(e) => setLocationOverride(e.target.value)}
               placeholder="Location (city or zip)"
-              className="px-3 py-2 rounded-lg border border-gray-700 bg-gray-800 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-48"
+              disabled={nationwideMode}
+              className="px-3 py-2 rounded-lg border border-gray-700 bg-gray-800 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-48 disabled:opacity-40"
             />
             <select
               value={radiusOverride}
               onChange={(e) => setRadiusOverride(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-gray-700 bg-gray-800 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              disabled={nationwideMode}
+              className="px-3 py-2 rounded-lg border border-gray-700 bg-gray-800 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-40"
             >
               <option value="">Any distance</option>
               {RADIUS_OPTIONS.map((r) => (
                 <option key={r} value={r}>{r} miles</option>
               ))}
             </select>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={nationwideMode}
+                onChange={(e) => setNationwideMode(e.target.checked)}
+                className="w-4 h-4 rounded accent-indigo-500"
+              />
+              <span className="text-sm text-gray-300 font-medium">Nationwide</span>
+            </label>
           </div>
+          {nationwideMode && (
+            <p className="mt-1 text-xs text-indigo-400">
+              Searches Facebook Marketplace across 15 major US cities. Takes longer (~2-3 min).
+            </p>
+          )}
 
           {!searchParams && (
             <div className="mt-3 flex flex-wrap gap-2">
