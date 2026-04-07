@@ -101,7 +101,13 @@ export default function MicroCenterPage() {
   }
 
   async function deleteSearch(id: string) {
-    await fetch(`/api/microcenter/saved?id=${id}`, { method: "DELETE" });
+    if (!window.confirm("Delete this saved search?")) return;
+    const res = await fetch(`/api/microcenter/saved?id=${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error ?? "Failed to delete search");
+      return;
+    }
     loadSaved();
   }
 
@@ -128,15 +134,15 @@ export default function MicroCenterPage() {
   return (
     <main className="max-w-5xl mx-auto px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">MicroCenter Open Box</h1>
-        <p className="text-gray-500 text-sm">Scans open box inventory across stores and finds deals with the best savings ratio. Filters out cables and low-value items.</p>
+        <h1 className="text-2xl font-bold text-gray-100 mb-1">MicroCenter Open Box</h1>
+        <p className="text-gray-400 text-sm">Scans open box inventory across stores and finds deals with the best savings ratio. Filters out cables and low-value items.</p>
       </div>
 
       {/* Controls */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-4">
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 mb-4">
         <div className="flex flex-wrap gap-6 items-end">
           <div>
-            <p className="text-xs font-medium text-gray-600 mb-2">Stores</p>
+            <p className="text-xs font-medium text-gray-400 mb-2">Stores</p>
             <div className="flex gap-3 flex-wrap">
               {Object.entries(QUICK_STORES).map(([name, id]) => (
                 <label key={id} className="flex items-center gap-2 cursor-pointer select-none">
@@ -144,51 +150,51 @@ export default function MicroCenterPage() {
                     type="checkbox"
                     checked={selectedStores.includes(id)}
                     onChange={() => toggleStore(id)}
-                    className="w-4 h-4 rounded accent-indigo-600"
+                    className="w-4 h-4 rounded accent-indigo-500"
                   />
-                  <span className="text-sm text-gray-800">{name}</span>
+                  <span className="text-sm text-gray-200">{name}</span>
                 </label>
               ))}
             </div>
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-gray-600">Min savings %</label>
+            <label className="text-xs font-medium text-gray-400">Min savings %</label>
             <input
               type="number"
               value={minSavings}
               min={5}
               max={90}
               onChange={(e) => setMinSavings(Number(e.target.value))}
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              className="border border-gray-700 bg-gray-800 text-gray-100 rounded-lg px-3 py-2 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
           <button
             onClick={scan}
             disabled={loading || selectedStores.length === 0}
-            className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-semibold px-6 py-2 rounded-lg transition-colors text-sm h-fit"
+            className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-800 disabled:text-indigo-400 text-white font-semibold px-6 py-2 rounded-lg transition-colors text-sm h-fit"
           >
             {loading ? "Scanning..." : "Scan Deals"}
           </button>
 
           {lastChecked && !loading && (
-            <span className="text-xs text-gray-400 self-center">Checked {lastChecked}</span>
+            <span className="text-xs text-gray-500 self-center">Checked {lastChecked}</span>
           )}
         </div>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 text-red-800 text-sm">{error}</div>
+        <div className="bg-red-900/30 border border-red-800 rounded-xl p-4 mb-4 text-red-300 text-sm">{error}</div>
       )}
 
       {/* Loading */}
       {loading && (
-        <div className="flex flex-col items-center gap-3 py-16 text-gray-500">
-          <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+        <div className="flex flex-col items-center gap-3 py-16 text-gray-400">
+          <div className="w-10 h-10 border-4 border-indigo-900 border-t-indigo-400 rounded-full animate-spin" />
           <p className="font-medium">Scanning {selectedStores.length} store{selectedStores.length > 1 ? "s" : ""}...</p>
-          <p className="text-sm text-gray-400">Takes ~15–30s per store</p>
+          <p className="text-sm text-gray-500">Takes ~15–30s per store</p>
         </div>
       )}
 
@@ -196,9 +202,9 @@ export default function MicroCenterPage() {
       {!loading && deals.length > 0 && (
         <div className="mb-8">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-400">
               {rawCount !== null && `${rawCount} open box items scanned · `}
-              <span className="font-semibold text-gray-900">{worthItDeals.length} worth it</span>
+              <span className="font-semibold text-gray-100">{worthItDeals.length} worth it</span>
               {otherDeals.length > 0 && ` · ${otherDeals.length} filtered out`}
             </p>
           </div>
@@ -213,7 +219,7 @@ export default function MicroCenterPage() {
 
           {otherDeals.length > 0 && (
             <details className="mt-2">
-              <summary className="text-sm text-gray-400 cursor-pointer hover:text-gray-600 mb-3">
+              <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-300 mb-3">
                 Show {otherDeals.length} filtered-out items
               </summary>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-3 opacity-60">
@@ -225,7 +231,7 @@ export default function MicroCenterPage() {
           )}
 
           {worthItDeals.length === 0 && (
-            <div className="text-center py-8 text-gray-400">
+            <div className="text-center py-8 text-gray-500">
               No deals met the criteria. Try lowering the min savings % or check back later.
             </div>
           )}
@@ -233,9 +239,9 @@ export default function MicroCenterPage() {
       )}
 
       {/* Save search */}
-      <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 mb-6">
-        <p className="text-sm font-semibold text-gray-800 mb-1">Save this search for email alerts</p>
-        <p className="text-xs text-gray-500 mb-3">
+      <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-5 mb-6">
+        <p className="text-sm font-semibold text-gray-200 mb-1">Save this search for email alerts</p>
+        <p className="text-xs text-gray-400 mb-3">
           Saves the current store selection + savings threshold. Run manually or schedule with cron.
         </p>
         <div className="flex gap-3 flex-wrap">
@@ -244,64 +250,64 @@ export default function MicroCenterPage() {
             placeholder="Search name (e.g. GPU deals)"
             value={saveName}
             onChange={(e) => setSaveName(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1 min-w-40 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            className="border border-gray-700 rounded-lg px-3 py-2 text-sm flex-1 min-w-40 bg-gray-800 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
           <input
             type="email"
             placeholder="your@email.com"
             value={saveEmail}
             onChange={(e) => setSaveEmail(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1 min-w-48 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            className="border border-gray-700 rounded-lg px-3 py-2 text-sm flex-1 min-w-48 bg-gray-800 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
           <button
             onClick={saveSearch}
             disabled={!saveName || !saveEmail || saving}
-            className="bg-gray-800 hover:bg-gray-900 disabled:bg-gray-300 text-white font-semibold px-5 py-2 rounded-lg transition-colors text-sm whitespace-nowrap"
+            className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold px-5 py-2 rounded-lg transition-colors text-sm whitespace-nowrap"
           >
             {saving ? "Saving..." : "Save Search"}
           </button>
         </div>
         {saveError && (
-          <p className="mt-2 text-xs text-red-600">{saveError}</p>
+          <p className="mt-2 text-xs text-red-400">{saveError}</p>
         )}
-        <p className="text-xs text-gray-400 mt-3">
-          Requires <code className="bg-gray-100 px-1 rounded">GMAIL_USER</code> + <code className="bg-gray-100 px-1 rounded">GMAIL_APP_PASSWORD</code> in <code className="bg-gray-100 px-1 rounded">.env.local</code> to send email.
-          For daily alerts: <code className="bg-gray-100 px-1 rounded text-[11px]">crontab -e</code> → add <code className="bg-gray-100 px-1 rounded text-[11px]">0 9 * * * curl -s -X POST http://localhost:3000/api/microcenter/saved/run?id=SEARCH_ID</code>
+        <p className="text-xs text-gray-500 mt-3">
+          Requires <code className="bg-gray-800 px-1 rounded">GMAIL_USER</code> + <code className="bg-gray-800 px-1 rounded">GMAIL_APP_PASSWORD</code> in <code className="bg-gray-800 px-1 rounded">.env.local</code> to send email.
+          For daily alerts: <code className="bg-gray-800 px-1 rounded text-[11px]">crontab -e</code> → add <code className="bg-gray-800 px-1 rounded text-[11px]">0 9 * * * curl -s -X POST http://localhost:3000/api/microcenter/saved/run?id=SEARCH_ID</code>
         </p>
       </div>
 
       {/* Saved searches */}
       {savedSearches.length > 0 && (
         <div>
-          <h2 className="text-base font-semibold text-gray-800 mb-3">Saved Searches</h2>
+          <h2 className="text-base font-semibold text-gray-200 mb-3">Saved Searches</h2>
           <div className="flex flex-col gap-3">
             {savedSearches.map((s) => (
-              <div key={s.id} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between gap-4 flex-wrap">
+              <div key={s.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 text-sm">{s.name}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="font-semibold text-gray-100 text-sm">{s.name}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
                     {s.storeIds.map((id) => Object.entries(STORES).find(([, v]) => v === id)?.[0] ?? id).join(", ")} · min {s.minSavings}% savings · {s.email}
                   </p>
                   {s.lastRun && (
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="text-xs text-gray-500 mt-0.5">
                       Last run: {new Date(s.lastRun).toLocaleString()} · {s.lastDealsFound ?? 0} deal{s.lastDealsFound !== 1 ? "s" : ""} found
                     </p>
                   )}
                   {runStatus[s.id] && (
-                    <p className="text-xs text-indigo-600 mt-1 font-medium">{runStatus[s.id]}</p>
+                    <p className="text-xs text-indigo-400 mt-1 font-medium">{runStatus[s.id]}</p>
                   )}
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <button
                     onClick={() => runSearch(s)}
                     disabled={runningId === s.id}
-                    className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white text-xs font-semibold px-4 py-1.5 rounded-lg transition-colors"
+                    className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-800 disabled:text-indigo-400 text-white text-xs font-semibold px-4 py-1.5 rounded-lg transition-colors"
                   >
                     {runningId === s.id ? "Running..." : "Run & Email"}
                   </button>
                   <button
                     onClick={() => deleteSearch(s.id)}
-                    className="text-xs text-red-500 hover:text-red-700 px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                    className="text-xs text-red-400 hover:text-red-300 px-2 py-1.5 rounded-lg hover:bg-red-900/30 transition-colors"
                   >
                     Delete
                   </button>
@@ -321,29 +327,29 @@ function DealCard({ deal }: { deal: Deal }) {
       href={deal.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-md transition-shadow flex flex-col"
+      className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden hover:shadow-md hover:border-gray-700 transition-shadow flex flex-col"
     >
       {deal.imageUrl && (
-        <div className="aspect-video bg-gray-50 overflow-hidden">
+        <div className="aspect-video bg-gray-800 overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={deal.imageUrl} alt={deal.title} className="w-full h-full object-contain p-2" />
         </div>
       )}
       <div className="p-4 flex flex-col gap-2 flex-1">
-        <p className="text-sm font-semibold text-gray-900 leading-snug line-clamp-2">{deal.title}</p>
+        <p className="text-sm font-semibold text-gray-100 leading-snug line-clamp-2">{deal.title}</p>
         <div className="flex items-baseline gap-2 flex-wrap">
-          <span className="text-xl font-bold text-green-700">${deal.openBoxPrice}</span>
+          <span className="text-xl font-bold text-green-400">${deal.openBoxPrice}</span>
           {deal.originalPrice && (
-            <span className="text-sm text-gray-400 line-through">${deal.originalPrice}</span>
+            <span className="text-sm text-gray-500 line-through">${deal.originalPrice}</span>
           )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {deal.savingsPercent !== null && (
-            <span className="bg-green-100 text-green-800 text-xs font-bold px-2 py-0.5 rounded-full">
+            <span className="bg-green-900/40 text-green-300 text-xs font-bold px-2 py-0.5 rounded-full">
               {deal.savingsPercent}% off{deal.savingsAmount ? ` · save $${deal.savingsAmount}` : ""}
             </span>
           )}
-          <span className="text-xs text-gray-400">{deal.store}</span>
+          <span className="text-xs text-gray-500">{deal.store}</span>
         </div>
       </div>
     </a>

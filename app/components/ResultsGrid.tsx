@@ -14,7 +14,7 @@ export default function ResultsGrid({ listings, activeSource }: Props) {
 
   if (filtered.length === 0) {
     return (
-      <div className="text-center py-10 text-gray-400">
+      <div className="text-center py-10 text-gray-500">
         <p>No eBay results found. Try the Craigslist or Facebook Marketplace links below.</p>
       </div>
     );

@@ -2,9 +2,9 @@
 import type { Listing } from "@/app/lib/types";
 
 const SOURCE_COLORS = {
-  craigslist: "bg-purple-100 text-purple-800",
-  ebay: "bg-yellow-100 text-yellow-800",
-  facebook: "bg-blue-100 text-blue-800",
+  craigslist: "bg-purple-900/40 text-purple-300",
+  ebay: "bg-yellow-900/40 text-yellow-300",
+  facebook: "bg-blue-900/40 text-blue-300",
 };
 
 const SOURCE_LABELS = {
@@ -30,10 +30,10 @@ export default function ListingCard({ listing }: { listing: Listing }) {
       href={listing.sourceUrl}
       target="_blank"
       rel="noopener noreferrer"
-      className="group flex flex-col bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-gray-200 transition-all overflow-hidden"
+      className="group flex flex-col bg-gray-900 rounded-2xl shadow-sm border border-gray-800 hover:shadow-md hover:border-gray-700 transition-all overflow-hidden"
     >
       {/* Image */}
-      <div className="h-44 bg-gray-100 flex items-center justify-center overflow-hidden">
+      <div className="h-44 bg-gray-800 flex items-center justify-center overflow-hidden">
         {listing.imageUrl ? (
           <img
             src={listing.imageUrl}
@@ -41,14 +41,14 @@ export default function ListingCard({ listing }: { listing: Listing }) {
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
-          <span className="text-4xl text-gray-300">📦</span>
+          <span className="text-4xl text-gray-600">📦</span>
         )}
       </div>
 
       {/* Content */}
       <div className="p-4 flex flex-col gap-2 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium text-gray-900 line-clamp-2 leading-snug flex-1">
+          <p className="text-sm font-medium text-gray-100 line-clamp-2 leading-snug flex-1">
             {listing.title}
           </p>
           <span
@@ -59,10 +59,10 @@ export default function ListingCard({ listing }: { listing: Listing }) {
         </div>
 
         <div className="flex items-center justify-between mt-auto pt-2">
-          <span className="text-lg font-bold text-gray-900">
+          <span className="text-lg font-bold text-gray-100">
             {listing.price != null ? `$${listing.price.toLocaleString()}` : "Price N/A"}
           </span>
-          <div className="text-right text-xs text-gray-400 leading-tight">
+          <div className="text-right text-xs text-gray-500 leading-tight">
             {listing.location && <div>{listing.location}</div>}
             {listing.postedAt && <div>{timeAgo(listing.postedAt)}</div>}
           </div>

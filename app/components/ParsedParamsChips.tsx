@@ -21,11 +21,11 @@ export default function ParsedParamsChips({ params, categoryLabel }: Props) {
 
   return (
     <div className="flex flex-wrap gap-2 mt-4">
-      <span className="text-xs text-gray-400 self-center">Claude extracted:</span>
+      <span className="text-xs text-gray-500 self-center">Claude extracted:</span>
       {chips.map((chip) => (
         <span
           key={chip.label}
-          className="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full px-3 py-1"
+          className="inline-flex items-center gap-1 text-xs bg-indigo-950 text-indigo-300 border border-indigo-800 rounded-full px-3 py-1"
         >
           <span className="text-indigo-400 font-medium">{chip.label}:</span>
           {chip.value}
