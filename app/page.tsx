@@ -303,26 +303,28 @@ export default function Home() {
           </form>
 
           {/* Location & distance overrides */}
-          <div className="mt-3 flex gap-3 items-center flex-wrap">
-            <input
-              type="text"
-              value={locationOverride}
-              onChange={(e) => setLocationOverride(e.target.value)}
-              placeholder="Location (city or zip)"
-              disabled={nationwideMode}
-              className="px-3 py-2 rounded-lg border border-gray-700 bg-gray-800 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-48 disabled:opacity-40"
-            />
-            <select
-              value={radiusOverride}
-              onChange={(e) => setRadiusOverride(e.target.value)}
-              disabled={nationwideMode}
-              className="px-3 py-2 rounded-lg border border-gray-700 bg-gray-800 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-40"
-            >
-              <option value="">Any distance</option>
-              {RADIUS_OPTIONS.map((r) => (
-                <option key={r} value={r}>{r} miles</option>
-              ))}
-            </select>
+          <div className="mt-3 flex flex-col sm:flex-row gap-3 sm:items-center">
+            <div className="flex gap-3 items-center">
+              <input
+                type="text"
+                value={locationOverride}
+                onChange={(e) => setLocationOverride(e.target.value)}
+                placeholder="Location (city or zip)"
+                disabled={nationwideMode}
+                className="px-3 py-2 rounded-lg border border-gray-700 bg-gray-800 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent flex-1 sm:flex-none sm:w-48 disabled:opacity-40"
+              />
+              <select
+                value={radiusOverride}
+                onChange={(e) => setRadiusOverride(e.target.value)}
+                disabled={nationwideMode}
+                className="px-3 py-2 rounded-lg border border-gray-700 bg-gray-800 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-40"
+              >
+                <option value="">Any distance</option>
+                {RADIUS_OPTIONS.map((r) => (
+                  <option key={r} value={r}>{r} miles</option>
+                ))}
+              </select>
+            </div>
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"

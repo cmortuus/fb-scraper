@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     let browser;
     try {
       browser = await chromium.launchPersistentContext(BRAVE_USER_DATA, {
-        headless: false,
+        headless: true,
         executablePath: BRAVE_EXECUTABLE,
         args: [
           "--no-sandbox",
