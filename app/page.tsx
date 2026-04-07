@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import ParsedParamsChips from "./components/ParsedParamsChips";
 import ListingCard from "./components/ListingCard";
 import type { Listing, SearchParams } from "./lib/types";
+import type { SavedFinderSearch } from "./lib/saved-finder-searches";
 import { CITY_TO_CL } from "./lib/cities";
 
 type Source = "all" | "craigslist" | "ebay" | "facebook";
@@ -48,6 +49,77 @@ export default function Home() {
   const [clUrl, setClUrl] = useState("");
   const [activeSource, setActiveSource] = useState<Source>("all");
   const [sourceErrors, setSourceErrors] = useState<string[]>([]);
+
+  // Saved searches
+  const [savedSearches, setSavedSearches] = useState<SavedFinderSearch[]>([]);
+  const [saveName, setSaveName] = useState("");
+  const [saveEmail, setSaveEmail] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [runningId, setRunningId] = useState<string | null>(null);
+  const [runStatus, setRunStatus] = useState<Record<string, string>>({});
+
+  const loadSaved = useCallback(async () => {
+    try {
+      const res = await fetch("/api/finder/saved");
+      setSavedSearches(await res.json());
+    } catch {}
+  }, []);
+
+  useEffect(() => { loadSaved(); }, [loadSaved]);
+
+  async function saveSearch() {
+    if (!saveName || !saveEmail || !description.trim()) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await fetch("/api/finder/saved", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: saveName,
+          description: description.trim(),
+          email: saveEmail,
+          location: locationOverride.trim() || undefined,
+          radiusMiles: radiusOverride ? Number(radiusOverride) : undefined,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setSaveError(data.error ?? "Failed to save");
+      } else {
+        setSaveName("");
+        loadSaved();
+      }
+    } catch {
+      setSaveError("Failed to reach server");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteSavedSearch(id: string) {
+    if (!window.confirm("Delete this saved search?")) return;
+    await fetch(`/api/finder/saved?id=${id}`, { method: "DELETE" });
+    loadSaved();
+  }
+
+  async function runSavedSearch(s: SavedFinderSearch) {
+    setRunningId(s.id);
+    setRunStatus((prev) => ({ ...prev, [s.id]: "Running..." }));
+    try {
+      const res = await fetch(`/api/finder/saved/run?id=${s.id}`, { method: "POST" });
+      const data = await res.json();
+      if (data.error) setRunStatus((prev) => ({ ...prev, [s.id]: `Error: ${data.error}` }));
+      else if (!data.sent) setRunStatus((prev) => ({ ...prev, [s.id]: data.message ?? "No results" }));
+      else setRunStatus((prev) => ({ ...prev, [s.id]: `Emailed ${data.resultsFound} listing${data.resultsFound !== 1 ? "s" : ""}` }));
+    } catch {
+      setRunStatus((prev) => ({ ...prev, [s.id]: "Failed" }));
+    } finally {
+      setRunningId(null);
+      loadSaved();
+    }
+  }
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -358,6 +430,95 @@ export default function Home() {
             <div className="text-7xl mb-4">🛒</div>
             <p className="text-xl font-medium text-gray-500">Describe what you&apos;re looking for above</p>
             <p className="text-sm mt-2 text-gray-600">Searches eBay & Facebook Marketplace inline</p>
+          </div>
+        )}
+
+        {/* Save current search */}
+        {description.trim() && !loading && (
+          <div className="mt-8 bg-gray-900/50 border border-gray-800 rounded-2xl p-5">
+            <p className="text-sm font-semibold text-gray-200 mb-1">Save this search for alerts</p>
+            <p className="text-xs text-gray-400 mb-3">
+              Get notified by email when new listings match your search.
+            </p>
+            <div className="flex gap-3 flex-wrap">
+              <input
+                type="text"
+                placeholder="Name (e.g. Gym equipment)"
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                className="border border-gray-700 rounded-lg px-3 py-2 text-sm flex-1 min-w-40 bg-gray-800 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <input
+                type="email"
+                placeholder="your@email.com"
+                value={saveEmail}
+                onChange={(e) => setSaveEmail(e.target.value)}
+                className="border border-gray-700 rounded-lg px-3 py-2 text-sm flex-1 min-w-48 bg-gray-800 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <button
+                onClick={saveSearch}
+                disabled={!saveName || !saveEmail || saving}
+                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold px-5 py-2 rounded-lg transition-colors text-sm whitespace-nowrap"
+              >
+                {saving ? "Saving..." : "Save Search"}
+              </button>
+            </div>
+            {saveError && <p className="mt-2 text-xs text-red-400">{saveError}</p>}
+          </div>
+        )}
+
+        {/* Saved searches list */}
+        {savedSearches.length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-base font-semibold text-gray-200 mb-3">Saved Searches</h2>
+            <div className="flex flex-col gap-3">
+              {savedSearches.map((s) => (
+                <div key={s.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-100 text-sm">{s.name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">
+                      &ldquo;{s.description}&rdquo;
+                      {s.location && ` · ${s.location}`}
+                      {s.radiusMiles && ` · ${s.radiusMiles}mi`}
+                      {` · ${s.email}`}
+                    </p>
+                    {s.lastRun && (
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Last run: {new Date(s.lastRun).toLocaleString()} · {s.lastResultCount ?? 0} result{s.lastResultCount !== 1 ? "s" : ""}
+                      </p>
+                    )}
+                    {runStatus[s.id] && (
+                      <p className="text-xs text-indigo-400 mt-1 font-medium">{runStatus[s.id]}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => {
+                        setDescription(s.description);
+                        if (s.location) setLocationOverride(s.location);
+                        if (s.radiusMiles) setRadiusOverride(String(s.radiusMiles));
+                      }}
+                      className="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      Load
+                    </button>
+                    <button
+                      onClick={() => runSavedSearch(s)}
+                      disabled={runningId === s.id}
+                      className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-800 disabled:text-indigo-400 text-white text-xs font-semibold px-4 py-1.5 rounded-lg transition-colors"
+                    >
+                      {runningId === s.id ? "Running..." : "Run & Email"}
+                    </button>
+                    <button
+                      onClick={() => deleteSavedSearch(s.id)}
+                      className="text-xs text-red-400 hover:text-red-300 px-2 py-1.5 rounded-lg hover:bg-red-900/30 transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
